@@ -1,0 +1,138 @@
+import { useEffect, useMemo, useState } from 'react'
+import './App.css'
+
+function App() {
+  const [search, setSearch] = useState('')
+  const [submittedSearch, setSubmittedSearch] = useState('')
+  const [result, setResult] = useState([])
+  const [error, setError] = useState('')
+  const [filter, setFilter] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    if (!submittedSearch.trim()) {
+      return
+    }
+
+    async function fetchPincode() {
+      setLoading(true)
+
+      try {
+        const response = await fetch(
+          `https://api.postalpincode.in/pincode/${submittedSearch}`,
+        )
+
+        if (!response.ok) {
+          throw new Error('No data found')
+        }
+
+        const data = await response.json()
+        setResult(
+          data.map((item) => ({
+            ...item,
+            PostOffice: item.PostOffice || [],
+          })),
+        )
+        setError('')
+      } catch (err) {
+        setResult([])
+        setError(err.message || 'Something went wrong')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchPincode()
+  }, [submittedSearch])
+
+  function handleLookup() {
+    if (!search.trim()) {
+      setResult([])
+      setError('')
+      setSubmittedSearch('')
+      return
+    }
+
+    const pincode = search.trim()
+
+    if (pincode.length !== 6) {
+      alert('Pincode must be exactly 6 digits.')
+      return
+    }
+
+    setSubmittedSearch(pincode)
+    setSearch('')
+  }
+
+  const filterValue = useMemo(
+    () =>
+      result.map((item) => ({
+        ...item,
+        PostOffice: item.PostOffice.filter((office) =>
+          office.Name.toLowerCase().includes(filter.toLowerCase()),
+        ),
+      })),
+    [result, filter],
+  )
+
+  return (
+    <>
+      <header className="page-header">
+        <span className="header-badge">INDIA POST</span>
+        <h1>Find post offices</h1>
+        <p>Search by pincode to discover nearby post office details.</p>
+      </header>
+
+      <input
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        placeholder="Enter pincode"
+      />
+      <button onClick={handleLookup}>LookUp</button>
+
+      {error && <p>{error}</p>}
+
+      {loading && (
+        <p className="loading-message" role="status">
+          Loading post offices...
+        </p>
+      )}
+
+      {!loading && result.length > 0 && (
+        <>
+          <input
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            placeholder="Filter post offices"
+          />
+
+          <div>
+            {filterValue.map((item, itemIndex) => (
+              <section key={`${item.Status}-${itemIndex}`}>
+                {result[itemIndex].PostOffice.length > 0 ? (
+                  item.PostOffice.length > 0 ? (
+                    item.PostOffice.map((office, officeIndex) => (
+                      <article key={`${office.Name}-${officeIndex}`}>
+                        <h2>{office.Name}</h2>
+                        <p>Branch type: {office.BranchType}</p>
+                        <p>District: {office.District}</p>
+                        <p>State: {office.State}</p>
+                        <p>Pincode: {office.Pincode}</p>
+                      </article>
+                    ))
+                  ) : (
+                    <p>No post offices match your filter.</p>
+                  )
+                ) : (
+                  <p>{item.Message || 'No post offices found.'}</p>
+                )}
+              </section>
+            ))}
+          </div>
+        </>
+      )}
+    </>
+  )
+}
+
+export default App
